@@ -1,0 +1,20 @@
+[project]
+name = "vitreo"
+version = "1.0.0"
+description = "Vitreo: medical appointments and ESI triage API"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["vitreo"]
+omit = ["vitreo/seed.py"]
+
+# Mutation testing scope: the business rules (ESI triage, appointment lifecycle)
+# and the security core (password hashing, JWT, brute-force limiter).
+[tool.mutmut]
+source_paths = ["vitreo"]
+only_mutate = ["vitreo/domain/*", "vitreo/security/passwords.py", "vitreo/security/tokens.py", "vitreo/security/rate_limit.py"]
+pytest_add_cli_args_test_selection = ["tests/"]

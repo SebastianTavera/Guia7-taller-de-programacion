@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests + SonarCloud
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # SonarCloud needs the history to detect new code
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests with coverage
+        run: pytest --cov --cov-report=xml --cov-report=term
+
+      - name: SonarCloud scan
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v5
+
+  mutation:
+    name: Mutation testing (min 50%)
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # publishes the score badge to the `badges` branch
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run mutmut
+        run: mutmut run
+
+      - name: Check mutation score
+        run: |
+          mutmut export-cicd-stats
+          python scripts/check_mutation_score.py --min 50
+
+      - name: Show surviving mutants
+        if: always()
+        run: mutmut results || true
+
+      - name: Publish mutation badge
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mutmut badge --output "$RUNNER_TEMP/mutation.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan badges-tmp
+          git rm -rf --quiet .
+          cp "$RUNNER_TEMP/mutation.json" mutation.json
+          git add mutation.json
+          git commit -m "Update mutation badge"
+          git push --force origin HEAD:badges
