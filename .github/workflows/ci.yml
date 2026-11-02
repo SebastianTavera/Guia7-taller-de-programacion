@@ -33,7 +33,7 @@ jobs:
 
       - name: SonarCloud scan
         if: env.SONAR_TOKEN != ''
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v8
 
   mutation:
     name: Mutation testing (min 50%)
